@@ -1,30 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 
 export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stripe, setStripe] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const priceId = searchParams.get('price') || undefined;
 
   useEffect(() => {
     async function initializeStripe() {
       try {
-        // Initialize Stripe with publishable key from environment
         const stripeInstance = await loadStripe(
           process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
         );
         setStripe(stripeInstance);
 
-        // Fetch client secret from your API
-        const response = await fetch('/api/checkout');
+        // Build URL with optional price query param
+        const apiUrl = priceId ? `/api/checkout?price=${priceId}` : '/api/checkout';
+        const response = await fetch(apiUrl);
         if (!response.ok) {
           throw new Error(`Failed to fetch checkout session: ${response.statusText}`);
         }
         const { client_secret } = await response.json();
 
-        // Confirm embedded checkout
         if (stripeInstance && client_secret) {
           const { error } = await stripeInstance.confirmEmbeddedCheckout({
             clientSecret: client_secret,
@@ -41,7 +43,7 @@ export default function CheckoutPage() {
     }
 
     initializeStripe();
-  }, []);
+  }, [priceId]);
 
   const handleBuyNow = async () => {
     if (!stripe) return;
@@ -50,7 +52,8 @@ export default function CheckoutPage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/checkout');
+      const apiUrl = priceId ? `/api/checkout?price=${priceId}` : '/api/checkout';
+      const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error(`Failed to fetch checkout session: ${response.statusText}`);
       }
